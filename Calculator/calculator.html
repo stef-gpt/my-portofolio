@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<title>Calculator</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --card: #11140e; --key: #1a1e16; --key-hi: #232819; --line: rgba(255, 255, 255, .1);
+    --text: #f2f4ee; --muted: #8d9385; --lime: #a6ff00; --bad: #ff6b5e;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { color-scheme: dark; }
+  body {
+    min-height: 100vh; color: var(--text); -webkit-font-smoothing: antialiased;
+    font-family: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background:
+      radial-gradient(700px 420px at 92% -5%, rgba(166, 255, 0, .15), transparent 65%),
+      radial-gradient(600px 400px at -5% 105%, rgba(31, 232, 180, .09), transparent 65%), var(--bg);
+    padding: clamp(14px, 3vw, 40px) clamp(12px, 3vw, 32px) calc(32px + env(safe-area-inset-bottom, 0px));
+  }
+  .app { max-width: 1060px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 26px; padding: clamp(14px, 2.4vw, 22px); }
+  h1 { font-size: 15px; font-weight: 600; color: var(--muted); letter-spacing: .02em; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  h1 b { color: var(--text); font-weight: 800; font-size: 19px; letter-spacing: -.03em; }
+  h1 b span { color: var(--lime); }
+  .badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.on { color: #0a0a0a; background: var(--lime); border-color: var(--lime); }
+
+  .screen { background: #0b0d09; border: 1px solid var(--line); border-radius: 20px; padding: 14px 16px 12px; margin-bottom: 14px; }
+  #expr {
+    width: 100%; background: transparent; border: 0; outline: none; color: var(--text); text-align: right;
+    font: inherit; font-size: clamp(24px, 5vw, 34px); font-weight: 500; letter-spacing: -.02em; padding: 4px 0;
+  }
+  #out { min-height: 34px; text-align: right; font-size: clamp(20px, 3.6vw, 26px); font-weight: 700; color: var(--muted); letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #out.final { color: var(--lime); }
+  #out.error { color: var(--bad); font-size: 16px; font-weight: 600; line-height: 34px; animation: shake .35s; }
+  @keyframes shake { 20% { transform: translateX(-6px); } 50% { transform: translateX(5px); } 80% { transform: translateX(-3px); } }
+
+  .pad { display: grid; gap: 8px; }
+  .g5 { grid-template-columns: repeat(5, 1fr); margin-bottom: 8px; }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .k {
+    height: 50px; border: 1px solid transparent; border-radius: 15px; background: var(--key); color: var(--text);
+    font: inherit; font-size: 16px; font-weight: 500; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+    transition: background-color .15s, transform .12s, border-color .15s, color .15s;
+  }
+  .k:hover { background: var(--key-hi); border-color: var(--line); }
+  .k:active { transform: scale(.94); }
+  .k:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+  .k.fn { font-size: 14.5px; color: #d6dccb; }
+  .k.mem { height: 36px; font-size: 13px; color: var(--muted); background: transparent; border-color: var(--line); }
+  .k.mem:hover { color: var(--lime); border-color: var(--lime); background: transparent; }
+  .k.op { background: rgba(166, 255, 0, .12); color: var(--lime); font-size: 22px; }
+  .k.op:hover { background: rgba(166, 255, 0, .2); }
+  .k.eq { background: linear-gradient(180deg, #c8ff4d, #a6ff00); color: #0a0a0a; font-size: 24px; font-weight: 700; }
+  .k.eq:hover { box-shadow: 0 8px 24px rgba(166, 255, 0, .25); }
+  .k.num { font-size: 21px; height: 56px; }
+  .k.tog.on { background: var(--lime); color: #0a0a0a; }
+  .k.red { color: #ff8f85; }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 12px; line-height: 1.55; }
+  .hint code { background: rgba(255, 255, 255, .07); padding: 1px 6px; border-radius: 6px; font-size: 12px; color: #cfd5c4; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tab { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 8px 18px; font: inherit; font-size: 14px; cursor: pointer; transition: color .2s, background .2s, border-color .2s; }
+  .tab[aria-selected="true"] { background: var(--lime); border-color: var(--lime); color: #0a0a0a; font-weight: 700; }
+  .spacer { flex: 1; }
+  .tiny { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  .tiny:hover { color: var(--bad); border-color: var(--bad); }
+  [hidden] { display: none !important; }
+
+  .hist { display: grid; gap: 8px; max-height: 560px; overflow-y: auto; padding-right: 2px; }
+  .h-item { display: block; width: 100%; text-align: right; background: rgba(255, 255, 255, .03); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; cursor: pointer; font: inherit; color: var(--text); transition: border-color .2s, background .2s; }
+  .h-item:hover { border-color: var(--lime); background: rgba(166, 255, 0, .05); }
+  .h-item small { display: block; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .h-item b { font-size: 21px; font-weight: 700; letter-spacing: -.02em; color: var(--lime); }
+  .empty { text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 16px; padding: 36px 12px; font-size: 14px; }
+
+  .gwrap { position: relative; }
+  #cv { display: block; width: 100%; height: clamp(280px, 46vh, 420px); border-radius: 18px; background: #0b0d09; border: 1px solid var(--line); touch-action: none; cursor: grab; }
+  #cv:active { cursor: grabbing; }
+  .zoom { position: absolute; right: 10px; top: 10px; display: grid; gap: 6px; }
+  .zoom button { width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--line); background: rgba(10, 12, 8, .85); color: var(--text); font-size: 18px; cursor: pointer; }
+  .zoom button:hover { border-color: var(--lime); color: var(--lime); }
+  .frow { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: #0b0d09; border: 1px solid var(--line); border-radius: 16px; padding: 4px 14px; }
+  .frow label { color: var(--lime); font-weight: 700; white-space: nowrap; }
+  #fx { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--text); font: inherit; font-size: 18px; padding: 10px 0; }
+  #gerr { color: var(--bad); font-size: 13px; min-height: 18px; margin-top: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { border: 1px solid var(--line); background: transparent; color: #cfd5c4; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  .chip:hover { border-color: var(--lime); color: var(--lime); }
+
+  @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .calc { max-width: 520px; width: 100%; margin: 0 auto; } }
+  @media (max-width: 400px) { .k { height: 46px; } .k.num { height: 52px; } .k.fn { font-size: 13px; } .pad { gap: 6px; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="card calc" aria-label="Calculator">
+    <h1><b>Calc<span>.</span></b><span><span class="badge" id="mBadge">M</span> <span class="badge on" id="aBadge">DEG</span></span></h1>
+    <div class="screen">
+      <input id="expr" type="text" inputmode="none" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Expression" placeholder="0" autofocus>
+      <div id="out" aria-live="polite"></div>
+    </div>
+    <div class="pad g5" id="padTop"></div>
+    <div class="pad g4" id="padNum"></div>
+    <p class="hint">Type or tap. Also try <code>sinh</code> <code>log2</code> <code>abs</code> <code>nCr(5,2)</code> <code>root(27,3)</code> <code>5!</code> <code>20%</code> and <code>2pi</code>. Open parentheses close themselves.</p>
+  </section>
+
+  <section class="card side" aria-label="History and graph">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tHist" aria-selected="true" type="button">History</button>
+      <button class="tab" role="tab" id="tGraph" aria-selected="false" type="button">Graph</button>
+      <span class="spacer"></span>
+      <button class="tiny" id="clearHist" type="button">Clear</button>
+    </div>
+
+    <div id="pHist" role="tabpanel">
+      <div class="hist" id="hist"></div>
+    </div>
+
+    <div id="pGraph" role="tabpanel" hidden>
+      <div class="frow"><label for="fx">f(x) =</label><input id="fx" type="text" value="sin(x)" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Function of x"></div>
+      <div class="gwrap">
+        <canvas id="cv" aria-label="Graph of the function"></canvas>
+        <div class="zoom"><button id="zIn" type="button" aria-label="Zoom in">+</button><button id="zOut" type="button" aria-label="Zoom out">−</button><button id="zReset" type="button" aria-label="Reset view">⌂</button></div>
+      </div>
+      <div id="gerr" role="status"></div>
+      <div class="chips" id="chips"></div>
+      <p class="hint">Drag to move, scroll or use + and − to zoom. The graph always uses radians.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /*ENGINE*/
+  var FUN = {
+    sin: 1, cos: 1, tan: 1, asin: 1, acos: 1, atan: 1, sinh: 1, cosh: 1, tanh: 1,
+    ln: 1, log: 1, log2: 1, exp: 1, sqrt: 1, cbrt: 1, abs: 1, floor: 1, ceil: 1, round: 1, fact: 1,
+    root: 2, ncr: 2, npr: 2, pow: 2, atan2: 2, mod: 2, min: 2, max: 2
+  };
+  var CONST = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI, phi: (1 + Math.sqrt(5)) / 2 };
+
+  function tokenize(src) {
+    if (/[\d.]\s+[\d.]/.test(src)) throw new Error('Missing operator between numbers');
+    var s = src.replace(/×/g, '*').replace(/÷/g, '/').replace(/[−–]/g, '-').replace(/π/g, 'pi').replace(/√/g, 'sqrt').replace(/\s+/g, '');
+    var out = [], i = 0, m, rest;
+    while (i < s.length) {
+      rest = s.slice(i);
+      if ((m = /^(\d+\.?\d*|\.\d+)(e[+-]?\d+)?/i.exec(rest))) { out.push({ t: 'num', v: parseFloat(m[0]) }); i += m[0].length; }
+      else if ((m = /^[a-z_][a-z0-9_]*/i.exec(rest))) { out.push({ t: 'id', v: m[0].toLowerCase() }); i += m[0].length; }
+      else if ('+-*/^%!(),'.indexOf(rest[0]) >= 0) { out.push({ t: 'op', v: rest[0] }); i++; }
+      else throw new Error('Unexpected “' + rest[0] + '”');
+    }
+    return out;
+  }
+
+  function parse(src) {
+    var tk = tokenize(src), p = 0;
+    function isOp(v) { var t = tk[p]; return !!t && t.t === 'op' && t.v === v; }
+    function expect(v) { if (!isOp(v)) throw new Error('Missing “' + v + '”'); p++; }
+    function expr() {
+      var a = term();
+      while (isOp('+') || isOp('-')) { var op = tk[p++].v; a = { t: 'bin', op: op, a: a, b: term() }; }
+      return a;
+    }
+    function term() {
+      var a = unary();
+      for (;;) {
+        var t = tk[p];
+        if (!t) break;
+        if (t.t === 'op' && (t.v === '*' || t.v === '/')) { p++; a = { t: 'bin', op: t.v, a: a, b: unary() }; }
+        else if (t.t === 'id' || (t.t === 'op' && t.v === '(') || (t.t === 'num' && tk[p - 1].t !== 'num')) { a = { t: 'bin', op: '*', a: a, b: unary() }; }
+        else break;
+      }
+      return a;
+    }
+    function unary() {
+      if (isOp('-')) { p++; return { t: 'neg', a: unary() }; }
+      if (isOp('+')) { p++; return unary(); }
+      return power();
+    }
+    function power() {
+      var a = postfix();
+      if (isOp('^')) { p++; return { t: 'bin', op: '^', a: a, b: unary() }; }
+      return a;
+    }
+    function postfix() {
+      var a = primary();
+      for (;;) {
+        if (isOp('!')) { p++; a = { t: 'fact', a: a }; }
+        else if (isOp('%')) { p++; a = { t: 'pct', a: a }; }
+        else break;
+      }
+      return a;
+    }
+    function primary() {
+      var t = tk[p];
+      if (!t) throw new Error('Incomplete expression');
+      if (t.t === 'num') { p++; return { t: 'num', v: t.v }; }
+      if (t.t === 'id') {
+        p++;
+        if (FUN[t.v] && isOp('(')) {
+          p++;
+          var args = [];
+          if (!isOp(')')) { do { args.push(expr()); } while (isOp(',') && (p++, true)); }
+          expect(')');
+          if (args.length !== FUN[t.v]) throw new Error(t.v + ' needs ' + FUN[t.v] + (FUN[t.v] > 1 ? ' values' : ' value'));
+          return { t: 'fn', n: t.v, args: args };
+        }
+        if (FUN[t.v]) throw new Error('Use ' + t.v + '( )');
+        return { t: 'var', n: t.v };
+      }
+      if (t.t === 'op' && t.v === '(') { p++; var e = expr(); expect(')'); return e; }
+      throw new Error('Unexpected “' + t.v + '”');
+    }
+    var ast = expr();
+    if (p < tk.length) throw new Error('Unexpected “' + tk[p].v + '”');
+    return ast;
+  }
+
+  function dom() { return new Error('Outside the allowed range'); }
+  function fact(n) {
+    if (n < 0 || Math.floor(n) !== n || n > 170) throw new Error('Factorial needs a whole number from 0 to 170');
+    var r = 1; for (var i = 2; i <= n; i++) r *= i; return r;
+  }
+  function whole(n) { if (n < 0 || Math.floor(n) !== n) throw new Error('Needs whole numbers'); }
+  function toR(v, c) { return c.angle === 'deg' ? v * Math.PI / 180 : v; }
+  function fromR(v, c) { return c.angle === 'deg' ? v * 180 / Math.PI : v; }
+  function snap(v) { return Math.abs(v) < 1e-14 ? 0 : v; }
+
+  function call(f, a, c) {
+    var x = a[0], r;
+    switch (f) {
+      case 'sin': return snap(Math.sin(toR(x, c)));
+      case 'cos': return snap(Math.cos(toR(x, c)));
+      case 'tan': r = toR(x, c); if (Math.abs(Math.cos(r)) < 1e-14) throw new Error('Tan is undefined here'); return snap(Math.tan(r));
+      case 'asin': if (x < -1 || x > 1) throw dom(); return fromR(Math.asin(x), c);
+      case 'acos': if (x < -1 || x > 1) throw dom(); return fromR(Math.acos(x), c);
+      case 'atan': return fromR(Math.atan(x), c);
+      case 'sinh': return Math.sinh(x);
+      case 'cosh': return Math.cosh(x);
+      case 'tanh': return Math.tanh(x);
+      case 'ln': if (x <= 0) throw dom(); return Math.log(x);
+      case 'log': if (x <= 0) throw dom(); return Math.log10(x);
+      case 'log2': if (x <= 0) throw dom(); return Math.log2(x);
+      case 'exp': return Math.exp(x);
+      case 'sqrt': if (x < 0) throw new Error('Square root of a negative number'); return Math.sqrt(x);
+      case 'cbrt': return Math.cbrt(x);
+      case 'abs': return Math.abs(x);
+      case 'floor': return Math.floor(x);
+      case 'ceil': return Math.ceil(x);
+      case 'round': return Math.round(x);
+      case 'fact': return fact(x);
+      case 'root':
+        if (a[1] === 0) throw dom();
+        if (x < 0 && Math.abs(a[1] % 2) === 1) return -Math.pow(-x, 1 / a[1]);
+        if (x < 0) throw dom();
+        return Math.pow(x, 1 / a[1]);
+      case 'ncr':
+        whole(x); whole(a[1]); if (a[1] > x) throw dom();
+        var k = Math.min(a[1], x - a[1]), res = 1;
+        for (var i = 1; i <= k; i++) res = res * (x - k + i) / i;
+        return Math.round(res);
+      case 'npr':
+        whole(x); whole(a[1]); if (a[1] > x) throw dom();
+        var pr = 1; for (var j = 0; j < a[1]; j++) pr *= (x - j);
+        return pr;
+      case 'pow': return Math.pow(x, a[1]);
+      case 'atan2': return fromR(Math.atan2(x, a[1]), c);
+      case 'mod': if (a[1] === 0) throw new Error('Can’t divide by zero'); return ((x % a[1]) + a[1]) % a[1];
+      case 'min': return Math.min(x, a[1]);
+      case 'max': return Math.max(x, a[1]);
+    }
+    throw new Error('Unknown function');
+  }
+
+  function ev(n, c) {
+    switch (n.t) {
+      case 'num': return n.v;
+      case 'var':
+        if (n.n === 'x' && c.x !== undefined) return c.x;
+        if (n.n === 'ans') return c.ans || 0;
+        if (Object.prototype.hasOwnProperty.call(CONST, n.n)) return CONST[n.n];
+        throw new Error('Unknown “' + n.n + '”');
+      case 'neg': return -ev(n.a, c);
+      case 'pct': return ev(n.a, c) / 100;
+      case 'fact': return fact(ev(n.a, c));
+      case 'bin':
+        var a = ev(n.a, c), b = ev(n.b, c);
+        if (n.op === '+') return a + b;
+        if (n.op === '-') return a - b;
+        if (n.op === '*') return a * b;
+        if (n.op === '/') { if (b === 0 && !c.graph) throw new Error('Can’t divide by zero'); return a / b; }
+        return Math.pow(a, b);
+      case 'fn': return call(n.n, n.args.map(function (x) { return ev(x, c); }), c);
+    }
+    throw new Error('Math error');
+  }
+
+  function closeParens(s) {
+    var o = 0, i;
+    for (i = 0; i < s.length; i++) { if (s[i] === '(') o++; else if (s[i] === ')' && o > 0) o--; }
+    for (i = 0; i < o; i++) s += ')';
+    return s;
+  }
+
+  function fmt(n) {
+    if (!isFinite(n)) return 'Error';
+    if (n === 0) return '0';
+    var abs = Math.abs(n);
+    if (abs >= 1e15 || abs < 1e-9) return n.toExponential(9).replace(/\.?0+e/, 'e').replace('e+', 'e');
+    return parseFloat(n.toPrecision(12)).toString();
+  }
+  /*END*/
+
+  var $ = function (id) { return document.getElementById(id); };
+  var inp = $('expr'), out = $('out');
+  var state = { angle: 'deg', second: false, mem: 0, hasMem: false, ans: 0, fresh: false, history: [] };
+  var KEY = 'adv-calc-v1';
+
+  function load() {
+    try {
+      var d = JSON.parse(localStorage.getItem(KEY) || '{}');
+      if (d.angle === 'rad' || d.angle === 'deg') state.angle = d.angle;
+      if (isFinite(d.mem)) state.mem = d.mem;
+      state.hasMem = !!d.hasMem;
+      if (Array.isArray(d.history)) state.history = d.history.filter(function (h) { return h && typeof h.e === 'string' && typeof h.r === 'string'; }).slice(0, 60);
+    } catch (e) { /* storage unavailable */ }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ angle: state.angle, mem: state.mem, hasMem: state.hasMem, history: state.history })); } catch (e) { /* ignore */ }
+  }
+
+  function calc(src) {
+    var s = closeParens(src);
+    if (!s.trim()) throw new Error('');
+    var v = ev(parse(s), { angle: state.angle, ans: state.ans });
+    if (typeof v !== 'number' || !isFinite(v)) throw new Error('Math error');
+    return v;
+  }
+
+  function preview() {
+    out.className = '';
+    var src = inp.value;
+    if (!src.trim()) { out.textContent = ''; return; }
+    try {
+      var v = calc(src);
+      var f = fmt(v);
+      out.textContent = f === src.trim() ? '' : '= ' + f;
+    } catch (e) { out.textContent = ''; }
+  }
+
+  function setCaret(pos) { try { inp.setSelectionRange(pos, pos); } catch (e) { /* ignore */ } }
+
+  function insert(t) {
+    var s, e;
+    if (state.fresh) {
+      state.fresh = false;
+      inp.value = /^[+\-*\/^%!×÷−]/.test(t) ? 'ans' : '';
+      s = e = inp.value.length;
+    } else {
+      s = inp.selectionStart; e = inp.selectionEnd;
+      if (s == null) { s = e = inp.value.length; }
+    }
+    inp.value = inp.value.slice(0, s) + t + inp.value.slice(e);
+    setCaret(s + t.length);
+    preview();
+  }
+
+  function back() {
+    if (state.fresh) { state.fresh = false; }
+    var s = inp.selectionStart, e = inp.selectionEnd;
+    if (s == null) { s = e = inp.value.length; }
+    if (s === e && s > 0) s--;
+    inp.value = inp.value.slice(0, s) + inp.value.slice(e);
+    setCaret(s);
+    preview();
+  }
+
+  function clearAll() { state.fresh = false; inp.value = ''; out.textContent = ''; out.className = ''; setCaret(0); }
+
+  function equals() {
+    var src = inp.value;
+    if (!src.trim()) return;
+    try {
+      var v = calc(src);
+      var f = fmt(v);
+      out.textContent = f;
+      out.className = 'final';
+      state.ans = v;
+      state.fresh = true;
+      state.history.unshift({ e: closeParens(src), r: f });
+      state.history = state.history.slice(0, 60);
+      save(); renderHistory();
+    } catch (err) {
+      out.className = 'error';
+      out.textContent = err.message || 'Error';
+    }
+  }
+
+  function currentValue() {
+    try { return calc(inp.value.trim() ? inp.value : String(state.ans)); } catch (e) { return null; }
+  }
+
+  function memAct(kind) {
+    if (kind === 'mc') { state.mem = 0; state.hasMem = false; }
+    else if (kind === 'mr') { insert(fmt(state.mem)); }
+    else {
+      var v = currentValue();
+      if (v === null) { out.className = 'error'; out.textContent = 'Enter a valid value first'; return; }
+      if (kind === 'ms') state.mem = v;
+      else if (kind === 'mp') state.mem += v;
+      else state.mem -= v;
+      state.hasMem = true;
+    }
+    save(); updateBadges();
+  }
+
+  function updateBadges() {
+    $('mBadge').className = 'badge' + (state.hasMem ? ' on' : '');
+    $('aBadge').textContent = state.angle.toUpperCase();
+  }
+
+  /* ---------- keypad ---------- */
+  var TOP = [
+    { l: 'MC', act: 'mc', c: 'mem' }, { l: 'MR', act: 'mr', c: 'mem' }, { l: 'M+', act: 'mp', c: 'mem' }, { l: 'M−', act: 'mm', c: 'mem' }, { l: 'MS', act: 'ms', c: 'mem' },
+    { l: '2nd', act: 'second', c: 'fn tog' }, { l: 'DEG', act: 'angle', c: 'fn tog', dyn: 'angle' }, { l: '(', i: '(', c: 'fn' }, { l: ')', i: ')', c: 'fn' }, { l: '⌫', act: 'back', c: 'fn red' },
+    { l: 'sin', i: 'sin(', l2: 'asin', i2: 'asin(', c: 'fn' }, { l: 'cos', i: 'cos(', l2: 'acos', i2: 'acos(', c: 'fn' }, { l: 'tan', i: 'tan(', l2: 'atan', i2: 'atan(', c: 'fn' },
+    { l: 'ln', i: 'ln(', l2: 'eˣ', i2: 'exp(', c: 'fn' }, { l: 'log', i: 'log(', l2: '10ˣ', i2: '10^', c: 'fn' },
+    { l: '√', i: 'sqrt(', l2: '∛', i2: 'cbrt(', c: 'fn' }, { l: 'x²', i: '^2', l2: 'x³', i2: '^3', c: 'fn' }, { l: 'xʸ', i: '^', l2: 'ʸ√x', i2: 'root(', c: 'fn' },
+    { l: '1/x', i: '1/(', l2: '|x|', i2: 'abs(', c: 'fn' }, { l: 'n!', i: '!', l2: 'nCr', i2: 'nCr(', c: 'fn' },
+    { l: 'π', i: 'π', c: 'fn' }, { l: 'e', i: 'e', c: 'fn' }, { l: 'Ans', i: 'ans', c: 'fn' }, { l: '%', i: '%', c: 'fn' }, { l: 'AC', act: 'ac', c: 'fn red' }
+  ];
+  var NUM = [
+    '7', '8', '9', { l: '÷', i: '÷', c: 'op' },
+    '4', '5', '6', { l: '×', i: '×', c: 'op' },
+    '1', '2', '3', { l: '−', i: '−', c: 'op' },
+    '0', '.', { l: '=', act: 'eq', c: 'eq' }, { l: '+', i: '+', c: 'op' }
+  ];
+  var keyEls = [];
+
+  function buildKey(def, host) {
+    if (typeof def === 'string') def = { l: def, i: def, c: 'num' };
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'k ' + (def.c || '');
+    b.textContent = def.l;
+    b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    b.addEventListener('click', function () { press(def); inp.focus({ preventScroll: true }); });
+    host.appendChild(b);
+    keyEls.push({ el: b, def: def });
+  }
+
+  function press(d) {
+    if (d.act === 'second') { state.second = !state.second; refreshKeys(); return; }
+    if (d.act === 'angle') { state.angle = state.angle === 'deg' ? 'rad' : 'deg'; save(); updateBadges(); refreshKeys(); preview(); return; }
+    if (d.act === 'back') return back();
+    if (d.act === 'ac') return clearAll();
+    if (d.act === 'eq') return equals();
+    if (d.act) return memAct(d.act);
+    insert(state.second && d.i2 ? d.i2 : d.i);
+  }
+
+  function refreshKeys() {
+    keyEls.forEach(function (k) {
+      var d = k.def;
+      if (d.act === 'second') k.el.classList.toggle('on', state.second);
+      if (d.dyn === 'angle') { k.el.textContent = state.angle.toUpperCase(); k.el.classList.toggle('on', state.angle === 'rad'); }
+      if (d.l2) k.el.textContent = state.second ? d.l2 : d.l;
+    });
+  }
+
+  TOP.forEach(function (d) { buildKey(d, $('padTop')); });
+  NUM.forEach(function (d) { buildKey(d, $('padNum')); });
+
+  /* ---------- keyboard ---------- */
+  inp.addEventListener('input', function () { state.fresh = false; preview(); });
+  inp.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); equals(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); clearAll(); return; }
+    if (state.fresh && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); insert(e.key); return; }
+    if (state.fresh && (e.key === 'Backspace' || e.key === 'Delete')) { state.fresh = false; }
+  });
+  document.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (t && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(t.tagName)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    inp.focus({ preventScroll: true });
+  });
+
+  /* ---------- history ---------- */
+  function renderHistory() {
+    var host = $('hist');
+    host.textContent = '';
+    if (!state.history.length) {
+      var d = document.createElement('div');
+      d.className = 'empty';
+      d.textContent = 'Your calculations will appear here. Tap one to reuse its result.';
+      host.appendChild(d);
+      return;
+    }
+    state.history.forEach(function (h) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'h-item';
+      b.title = 'Insert ' + h.r;
+      var s = document.createElement('small'); s.textContent = h.e;
+      var r = document.createElement('b'); r.textContent = '= ' + h.r;
+      b.appendChild(s); b.appendChild(r);
+      b.addEventListener('click', function () { insert(h.r); inp.focus({ preventScroll: true }); });
+      host.appendChild(b);
+    });
+  }
+  $('clearHist').addEventListener('click', function () { state.history = []; save(); renderHistory(); });
+
+  /* ---------- tabs ---------- */
+  function showTab(g) {
+    $('tHist').setAttribute('aria-selected', g ? 'false' : 'true');
+    $('tGraph').setAttribute('aria-selected', g ? 'true' : 'false');
+    $('pHist').hidden = g;
+    $('pGraph').hidden = !g;
+    $('clearHist').hidden = g;
+    if (g) { resize(); }
+  }
+  $('tHist').addEventListener('click', function () { showTab(false); });
+  $('tGraph').addEventListener('click', function () { showTab(true); });
+
+  /* ---------- graph ---------- */
+  var cv = $('cv'), g = cv.getContext('2d');
+  var view = { x: 0, y: 0, s: 50 };
+  var gast = null;
+
+  function setFn() {
+    var v = $('fx').value.trim();
+    var err = '';
+    gast = null;
+    if (v) { try { gast = parse(closeParens(v)); } catch (e) { err = e.message; } }
+    $('gerr').textContent = err;
+    draw();
+  }
+
+  function resize() {
+    var r = cv.getBoundingClientRect();
+    if (!r.width) return;
+    var d = window.devicePixelRatio || 1;
+    cv.width = Math.round(r.width * d);
+    cv.height = Math.round(r.height * d);
+    g.setTransform(d, 0, 0, d, 0, 0);
+    draw();
+  }
+
+  function draw() {
+    var w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    g.clearRect(0, 0, w, h);
+    function px(x) { return (x - view.x) * view.s + w / 2; }
+    function py(y) { return h / 2 - (y - view.y) * view.s; }
+    var raw = 64 / view.s, pw = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / pw;
+    var step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pw;
+    var x0 = view.x - w / 2 / view.s, x1 = view.x + w / 2 / view.s;
+    var y0 = view.y - h / 2 / view.s, y1 = view.y + h / 2 / view.s;
+    var k, ax = Math.min(Math.max(py(0), 14), h - 6), ay = Math.min(Math.max(px(0), 6), w - 30);
+
+    g.lineWidth = 1;
+    g.font = '11px system-ui, sans-serif';
+    g.fillStyle = '#7f8576';
+    for (k = Math.ceil(x0 / step); k <= Math.floor(x1 / step); k++) {
+      var sx = Math.round(px(k * step)) + .5;
+      g.strokeStyle = k === 0 ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.07)';
+      g.beginPath(); g.moveTo(sx, 0); g.lineTo(sx, h); g.stroke();
+      if (k !== 0) { g.textAlign = 'center'; g.fillText(String(parseFloat((k * step).toPrecision(6))), sx, ax + 12 > h ? ax - 4 : ax + 12); }
+    }
+    for (k = Math.ceil(y0 / step); k <= Math.floor(y1 / step); k++) {
+      var sy = Math.round(py(k * step)) + .5;
+      g.strokeStyle = k === 0 ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.07)';
+      g.beginPath(); g.moveTo(0, sy); g.lineTo(w, sy); g.stroke();
+      if (k !== 0) { g.textAlign = 'left'; g.fillText(String(parseFloat((k * step).toPrecision(6))), ay + 5, sy - 3); }
+    }
+
+    if (!gast) return;
+    g.strokeStyle = '#a6ff00';
+    g.lineWidth = 2.5;
+    g.lineJoin = 'round';
+    g.beginPath();
+    var started = false, prev = 0;
+    for (var s = 0; s <= w; s++) {
+      var x = view.x + (s - w / 2) / view.s, y;
+      try { y = ev(gast, { x: x, angle: 'rad', ans: state.ans, graph: true }); } catch (e) { y = NaN; }
+      if (typeof y !== 'number' || !isFinite(y)) { started = false; continue; }
+      var yy = py(y);
+      if (yy < -h * 4 || yy > h * 5) { started = false; continue; }
+      if (started && Math.abs(yy - prev) > h * 1.5) started = false;
+      if (!started) { g.moveTo(s, yy); started = true; } else { g.lineTo(s, yy); }
+      prev = yy;
+    }
+    g.stroke();
+  }
+
+  var drag = null;
+  cv.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    view.x -= (e.clientX - drag.x) / view.s;
+    view.y += (e.clientY - drag.y) / view.s;
+    drag = { x: e.clientX, y: e.clientY };
+    draw();
+  });
+  function endDrag() { drag = null; }
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+
+  function zoomAt(factor, mx, my) {
+    var w = cv.clientWidth, h = cv.clientHeight;
+    var wx = view.x + (mx - w / 2) / view.s, wy = view.y - (my - h / 2) / view.s;
+    view.s = Math.max(4, Math.min(3000, view.s * factor));
+    view.x = wx - (mx - w / 2) / view.s;
+    view.y = wy + (my - h / 2) / view.s;
+    draw();
+  }
+  cv.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = cv.getBoundingClientRect();
+    zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  $('zIn').addEventListener('click', function () { zoomAt(1.4, cv.clientWidth / 2, cv.clientHeight / 2); });
+  $('zOut').addEventListener('click', function () { zoomAt(1 / 1.4, cv.clientWidth / 2, cv.clientHeight / 2); });
+  $('zReset').addEventListener('click', function () { view.x = 0; view.y = 0; view.s = 50; draw(); });
+  $('fx').addEventListener('input', setFn);
+  window.addEventListener('resize', resize);
+
+  ['sin(x)', 'x^2', 'x^3 - 3x', 'tan(x)', '1/x', 'sqrt(x)', 'sin(x)/x', 'exp(-x^2)', 'abs(x)'].forEach(function (f) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = f;
+    b.addEventListener('click', function () { $('fx').value = f; setFn(); });
+    $('chips').appendChild(b);
+  });
+
+  load();
+  updateBadges();
+  refreshKeys();
+  renderHistory();
+  setFn();
+  inp.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>
